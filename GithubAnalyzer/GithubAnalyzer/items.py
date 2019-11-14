@@ -11,6 +11,7 @@ import scrapy
 
 class GithubItem(scrapy.Item):
     url = scrapy.Field()
+    id = scrapy.Field()
 
 
 
