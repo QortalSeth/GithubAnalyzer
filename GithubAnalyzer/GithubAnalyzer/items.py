@@ -10,8 +10,15 @@ import scrapy
 
 
 class GithubItem(scrapy.Item):
-    url = scrapy.Field()
     id = scrapy.Field()
+    url = scrapy.Field()
+    language = scrapy.Field()
+
+
+class GithubProjectItem(scrapy.item):
+    watch = scrapy.Field()
+    star = scrapy.Field()
+    fork = scrapy.Field()
 
 
 

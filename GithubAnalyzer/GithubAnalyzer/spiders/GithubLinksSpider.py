@@ -14,6 +14,11 @@ class GithubLinksSpider(scrapy.Spider):
         'https://github.com/search?l=Java&o=desc&q=machine+learning&s=updated&type=Repositories',
         'https://github.com/search?l=JavaScript&o=desc&q=machine+learning&s=updated&type=Repositories'
     ]
+
+    custom_settings = {
+            'ITEM_PIPELINES' : {'GithubAnalyzer.pipelines.LinksPipeline': 300}
+        }
+
     pageNumber = 1
     urlID = 1
 
@@ -25,11 +30,10 @@ class GithubLinksSpider(scrapy.Spider):
         items = GithubItem()
         for repo in repos:
             items['url'] = self.baseurl + repo.xpath('.//a[@class = "v-align-middle"]/@href').extract_first()
-            items['id'] = self.urlID
+            items['id'] = self.pageNumber
+            items['language'] = repo.xpath('.//span[@itemprop="programmingLanguage"]/text()').extract_first()
             yield items
 
-
-        #nextPage = 'https://github.com/search?p=' + str(self.pageNumber) + '&q=machine+learning&type=Repositories'
         nextPage = response.xpath('//a[@rel = "next"]/@href').extract_first()
 
         if nextPage:
@@ -37,5 +41,4 @@ class GithubLinksSpider(scrapy.Spider):
             print ('Page: ' + str(self.pageNumber))
 
             yield response.follow(self.baseurl + nextPage, callback=self.parse)
-        else:
-            self.urlID += 1
+
