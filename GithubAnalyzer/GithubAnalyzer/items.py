@@ -21,11 +21,17 @@ class GithubProjectItem(scrapy.Item):
     fork = scrapy.Field()
 
     commits = scrapy.Field()
+    commitsLink = scrapy.Field()
+    commitHistory = scrapy.Field()
+
     branches = scrapy.Field()
     packages = scrapy.Field()
     releases = scrapy.Field()
     contributors = scrapy.Field()
     license = scrapy.Field()
+
+    about = scrapy.Field()
+    readme = scrapy.Field()
 
 
 
