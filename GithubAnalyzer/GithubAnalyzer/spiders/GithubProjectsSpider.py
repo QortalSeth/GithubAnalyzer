@@ -8,8 +8,9 @@ import re
 class GithubProjectsSpider(scrapy.Spider):
     name = 'GithubProjectsSpider'
     allowed_domains = ['https://github.com']
-    links = pd.read_csv('urlsDebug.csv')
+    links = pd.read_csv('urlsDebugProcessed.csv')
     start_urls = ['https://github.com/josephmisiti/awesome-machine-learning']
+   # start_urls = links.loc[links['id'] < 0, 'url'].tolist()
     baseurl = 'https://github.com/'
 
     custom_settings = {
@@ -33,8 +34,11 @@ class GithubProjectsSpider(scrapy.Spider):
         item['branches']     = re.sub("[^\d]", "", numSummary.xpath("./li[2]//span/text()").extract_first().strip())
         item['packages']     = re.sub("[^\d]", "", numSummary.xpath("./li[3]//span/text()").extract_first().strip())
         item['releases']     = re.sub("[^\d]", "", numSummary.xpath("./li[4]//span/text()").extract_first().strip())
-        item['contributors'] = re.sub("[^\d]", "", numSummary.xpath("./li[5]//span/text()").extract_first().strip())
 
+        if listLen >= 5:
+            item['contributors'] = re.sub("[^\d]", "", numSummary.xpath("./li[5]//span/text()").extract_first().strip())
+        else:
+            item['contributors'] = 0
         if listLen == 6:
             license = numSummary.xpath("./li[6]/a/text()").extract()[1].strip().lower()
 
@@ -50,7 +54,7 @@ class GithubProjectsSpider(scrapy.Spider):
         readmeLink = self.baseurl + response.xpath('//a[@title="README.md"]/@href').get()
 
         if readmeLink is not None:
-            response.follow(readmeLink, callback=self.parseReadme2, meta={'item': item})
+            yield response.follow(readmeLink, callback=self.parseReadme2, meta={'item': item})
 
             #x = response.follow(readmeLink)
             #nextResponse = x.response()
@@ -70,14 +74,22 @@ class GithubProjectsSpider(scrapy.Spider):
  #       yield item
 
     def parse(self, response):
+        url = response.request.url
         item = GithubProjectItem()
-        item['url'] = response.request.url
+        item['url'] = url
+
+
         item = self.parsePageHead(response, item)
         item = self.parseNumbersSummary(response, item)
         item = self.parseReadme(response, item)
 #        item = self.parseCommitHistory(response,item)
+
+        #self.links.loc[self.links['url'] == url, 'id'] = 1
         return item
     #      print (link)
     #   links = links.drop_duplicates(subset = 'url', keep='first')
     #   links = links['url']
     #   links.to_csv('urlsDebug.csv')
+
+    def closed( self, reason ):
+        self.links.to_csv('urlsDebugProcessed.csv', index=False)
