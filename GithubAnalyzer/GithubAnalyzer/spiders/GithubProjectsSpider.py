@@ -7,7 +7,7 @@ import re
 
 class GithubProjectsSpider(scrapy.Spider):
     name = 'GithubProjectsSpider'
-    allowed_domains = ['https://github.com']
+    allowed_domains = ['github.com']
     links = pd.read_csv('urlsDebugProcessed.csv')
     start_urls = ['https://github.com/josephmisiti/awesome-machine-learning']
    # start_urls = links.loc[links['id'] < 0, 'url'].tolist()
@@ -29,19 +29,21 @@ class GithubProjectsSpider(scrapy.Spider):
         numSummary = response.xpath("//ul[@class='numbers-summary']")
         listLen = len(numSummary.xpath('./li'))
         # print ('commits: '+ str(numSummary.xpath("./li[1]").extract_first()))
-        item['commitsLink'] =  self.baseurl + numSummary.xpath("./li[1]/a/@href").extract_first()
-        item['commits']      = re.sub("[^\d]", "", numSummary.xpath("./li[1]//span/text()").extract_first().strip())
-        item['branches']     = re.sub("[^\d]", "", numSummary.xpath("./li[2]//span/text()").extract_first().strip())
-        item['packages']     = re.sub("[^\d]", "", numSummary.xpath("./li[3]//span/text()").extract_first().strip())
-        item['releases']     = re.sub("[^\d]", "", numSummary.xpath("./li[4]//span/text()").extract_first().strip())
+        item['commitsLink']  = self.baseurl + numSummary.xpath("./li[1]/a/@href").extract_first()
+        item['commits']      = re.sub("[^\d]", "", numSummary.xpath("./li[1]//span/text()").extract_first())
+        item['branches']     = re.sub("[^\d]", "", numSummary.xpath("./li[2]//span/text()").extract_first())
+        item['packages']     = re.sub("[^\d]", "", numSummary.xpath("./li[3]//span/text()").extract_first())
+        item['releases']     = re.sub("[^\d]", "", numSummary.xpath("./li[4]//span/text()").extract_first())
 
-        if listLen >= 5:
-            item['contributors'] = re.sub("[^\d]", "", numSummary.xpath("./li[5]//span/text()").extract_first().strip())
+        contributors = numSummary.xpath("./li[5]//span/text()").extract_first()
+        contributorsCount = 0
+        if contributors is None:
+            item['contributors'] = -1
         else:
-            item['contributors'] = 0
+            item['contributors'] = re.sub("[^\d]", "", contributors)
+
         if listLen == 6:
             license = numSummary.xpath("./li[6]/a/text()").extract()[1].strip().lower()
-
             if license == 'view license':
                 item['license'] = 'Custom'
             else:
@@ -54,20 +56,17 @@ class GithubProjectsSpider(scrapy.Spider):
         readmeLink = self.baseurl + response.xpath('//a[@title="README.md"]/@href').get()
 
         if readmeLink is not None:
-            yield response.follow(readmeLink, callback=self.parseReadme2, meta={'item': item})
-
-            #x = response.follow(readmeLink)
-            #nextResponse = x.response()
+            return response.follow(readmeLink, callback=self.parseReadme2, meta={'item': item})
 
     def parseReadme2(self, response):
         item = response.meta['item']
         rawReadmeLink = self.baseurl + response.xpath('//a[@id="raw-url"]/@href').extract_first()
-        rawReadmeLink = response.urljoin(rawReadmeLink)
-        yield response.follow(rawReadmeLink, callback=self.parseReadmeFinal, meta={'item': item})
+        return response.follow(rawReadmeLink, callback=self.parseReadmeFinal, meta={'item': item})
 
     def parseReadmeFinal(self, response):
         item = response.meta['item']
-        item['readme'] = response.xpath('//pre/text()').extract_first()
+        text = ''.join(response.xpath('//body//text()').extract())
+        item['readme'] = text
         return item
 
  #   def parseCommitHistory(self, response, item):
@@ -78,18 +77,17 @@ class GithubProjectsSpider(scrapy.Spider):
         item = GithubProjectItem()
         item['url'] = url
 
-
         item = self.parsePageHead(response, item)
         item = self.parseNumbersSummary(response, item)
         item = self.parseReadme(response, item)
 #        item = self.parseCommitHistory(response,item)
 
         #self.links.loc[self.links['url'] == url, 'id'] = 1
-        return item
+        yield item
     #      print (link)
     #   links = links.drop_duplicates(subset = 'url', keep='first')
     #   links = links['url']
     #   links.to_csv('urlsDebug.csv')
-
-    def closed( self, reason ):
-        self.links.to_csv('urlsDebugProcessed.csv', index=False)
+    #
+    # def closed( self, reason ):
+    #     self.links.to_csv('urlsDebugProcessed.csv', index=False)
