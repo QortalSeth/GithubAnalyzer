@@ -15,7 +15,11 @@ class GithubItem(scrapy.Item):
 
 
 class GithubProjectItem(scrapy.Item):
+    id = scrapy.Field()
     url = scrapy.Field()
+    day = scrapy.Field()
+    month = scrapy.Field()
+    year = scrapy.Field()
     watch = scrapy.Field()
     star = scrapy.Field()
     fork = scrapy.Field()

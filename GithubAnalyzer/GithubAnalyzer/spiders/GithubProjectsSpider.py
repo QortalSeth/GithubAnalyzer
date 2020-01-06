@@ -5,19 +5,40 @@ from ..items import GithubProjectItem
 import re
 import traceback
 import csv
+from scrapy_splash import SplashRequest
 
 class GithubProjectsSpider(scrapy.Spider):
     name = 'GithubProjectsSpider'
     allowed_domains = ['github.com']
     links = pd.read_csv('urlsDebugProcessed.csv')
-    #start_urls = ['https://github.com/josephmisiti/awesome-machine-learning']
-    start_urls = links.loc[links['id'] == -1, 'url'].tolist()
+    debug = False
+    failedContributors = 0
+
+    if debug == True:
+        #start_urls = ['https://github.com/josephmisiti/awesome-machine-learning']
+        start_urls = ['https://github.com//Domdoug/PUC-Machine_Learning']
+    else:
+        start_urls = links.loc[links['id'] == -1, 'url'].tolist()
     baseurl = 'https://github.com/'
 
+
+    id = 1
+    totalUrls = len(links.loc[links['id'] == -1, 'url'].tolist())
     failedUrls = {}
     custom_settings = {
         'ITEM_PIPELINES': {'GithubAnalyzer.pipelines.LinksPipeline': 300}
     }
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield SplashRequest(url, self.parse, endpoint='render.html',
+                                args={
+                                    'wait': 1.0,
+                                    'viewport': 'full',
+                                    'render_all': 1,
+                                    'html': 1,
+                                })
+
 
     def executeScrape(self, function, response, item):
         try:
@@ -40,8 +61,8 @@ class GithubProjectsSpider(scrapy.Spider):
 
         watch = pageHead.xpath('./li[ '+ str(index) +']/a[2]/@aria-label').extract_first()
 
-        print('Index is: ' + str(index))
-        print('Watch is: ' + watch)
+        #print('Index is: ' + str(index))
+        #print('Watch is: ' + watch)
         item['watch'] = re.sub("[^\d]", "", watch)
         listLen += 1
         item['star'] = re.sub("[^\d]", "", pageHead.xpath('./li['+ str(index) +']/a[2]/@aria-label').extract_first())
@@ -51,6 +72,13 @@ class GithubProjectsSpider(scrapy.Spider):
         about = response.xpath('//span[@itemprop="about"]/text()').extract_first()
         if about is not None:
             item['about'] = about.strip()
+
+        date = response.xpath('//span[@itemprop="dateModified"]/relative-time/@datetime').extract_first()
+        #date = response.xpath('//span')
+        dateParts = date.split('-')
+        item['year'] = int(dateParts[0])
+        item['month'] = int(dateParts[1])
+        item['day'] = int(dateParts[2][:2])
 
         return item
 
@@ -71,8 +99,12 @@ class GithubProjectsSpider(scrapy.Spider):
         item['releases']     = re.sub("[^\d]", "", numSummary.xpath("./li[4]//span/text()").extract_first())
 
         contributors = numSummary.xpath("./li[5]//span/text()").extract_first()
+
+        #print(response.body)
         if contributors is None:
             item['contributors'] = -1
+            self.failedContributors += 1
+            print('Failed Contributors is: ' + str(self.failedContributors))
         else:
             item['contributors'] = re.sub("[^\d]", "", contributors)
 
@@ -86,18 +118,15 @@ class GithubProjectsSpider(scrapy.Spider):
             item['license'] = 'No License'
         return item
 
-    def parseReadme(self, response, item):
-        readmeLink = response.xpath('//a[@title="README.md"]/@href').get()
 
-        if readmeLink is not None:
-            return response.follow(self.baseurl + readmeLink, callback=self.parseReadme2, meta={'item': item})
-
-    def parseReadme2(self, response):
+    def parseReadme(self, response):
+        #print('in parseReadme')
         item = response.meta['item']
         rawReadmeLink = self.baseurl + response.xpath('//a[@id="raw-url"]/@href').extract_first()
         return response.follow(rawReadmeLink, callback=self.parseReadmeFinal, meta={'item': item})
 
     def parseReadmeFinal(self, response):
+        #print('in parseReadmeFinal')
         item = response.meta['item']
         text = ''.join(response.xpath('//body//text()').extract())
         item['readme'] = text
@@ -110,24 +139,33 @@ class GithubProjectsSpider(scrapy.Spider):
         url = response.request.url
         item = GithubProjectItem()
         item['url'] = url
-
+        print('ID: ' + str(self.id) +' of ' +str(self.totalUrls))
+        self.id += 1
 
         item = self.executeScrape(self.parseNumbersSummary, response, item)
         if item['contributors'] < 0:
             self.links.loc[self.links['url'] == url, 'id'] = -2
-            print 'url: ' + url +'has no commits'
+            print 'url: ' + url +' numbers summary failed'
             yield None
 
-        item = self.executeScrape( self.parsePageHead,response, item)
-        item = self.executeScrape(self.parseReadme,response, item)
+        item = self.executeScrape(self.parsePageHead,response, item)
 
-        self.links.loc[self.links['url'] == url, 'id'] = 1
-        yield item
+        readmeLink = response.xpath('//a[@title="README.md"]/@href').get()
+        if readmeLink is not None:
+            item = response.follow(self.baseurl + readmeLink, callback=self.parseReadme, meta={'item': item})
+            self.links.loc[self.links['url'] == url, 'id'] = 1
+            yield item
+        else:
+            self.links.loc[self.links['url'] == url, 'id'] = -2
+            print 'url: ' + url + ' has no readme'
+            yield None
+
+
 
     def closed( self, reason ):
-        self.links.to_csv('urlsDebugProcessed.csv', index=False)
-        (pd.DataFrame.from_dict(data=self.failedUrls, orient='index')
-         .to_csv('FailedURLs.csv'))
+        if self.debug == False:
+            self.links.to_csv('urlsDebugProcessed.csv', index=False)
+            (pd.DataFrame.from_dict(data=self.failedUrls, orient='index').to_csv('FailedURLs.csv'))
 
 
 
