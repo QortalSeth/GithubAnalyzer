@@ -50,9 +50,11 @@ def getLibraries(df):
         #print('readme: '+ row['readme'])
         for l in lib:
             newRow = row.copy()
+            newRow['readmeLength'] = len(newRow['readme'])
             newRow['readme'] = l
+
             newDF = newDF.append(newRow, ignore_index=True)
-            print(newDF)
+            #print(newDF)
 
 
     return newDF
@@ -60,8 +62,7 @@ def getLibraries(df):
 
 
 
-# have column for each library
-# find way to group by or add each column by loop
+
 
 #def comparePageHeads(df):
 
@@ -69,9 +70,15 @@ def getLibraries(df):
 def licenseTypes(df):
     return df.groupby(['license']).size().reset_index(name='counts')
 
-def main(df):
+def processProjectData(df):
     readmes = removeEmptyProjects(projects)
     newDF = getLibraries(readmes)
-    print(newDF)
+    newDF.rename(columns = {'readme': 'library'}, inplace=True)
+    newDF.to_csv('ProjectDataProcessed.csv')
+    print(newDF.columns)
 
-main(projects)
+processProjectData(projects)
+
+#data = pd.read_csv('ProjectDataProcessed.csv')
+#print(data.head(20))
+
