@@ -34,6 +34,7 @@ This plot shows the popularity of each library. It demonstrates that most librar
 
 
 These 2 plots demonstrate the number of total commits the scraped projects have for each library. They demonstrate that the libraries with the most commits are very different than their base popularity would suggest. The Histogram shows that most libraries have under 10000 commits, although there are significant outliers that may influence the results of the bar plot.
+
 ![](https://github.com/sethmjackson/GithubAnalyzer/blob/master/Images/Single%20Var/Star%20Count.png)
 
 
